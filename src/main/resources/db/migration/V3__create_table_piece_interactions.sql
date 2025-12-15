@@ -12,7 +12,3 @@ CREATE TABLE piece_interactions (
 
 CREATE INDEX idx_piece_interactions_battle_id ON piece_interactions(battle_id);
 CREATE INDEX idx_piece_interactions_attacker ON piece_interactions(attacker_piece_id);
-CREATE INDEX idx_piece_interactions_defender ON piece_interactions(defender_piece_id);
-CREATE INDEX idx_piece_interactions_type ON piece_interactions(interaction_type);
-CREATE INDEX idx_piece_interactions_created_at ON piece_interactions(created_at DESC);
-CREATE INDEX idx_piece_interactions_pieces ON piece_interactions(attacker_piece_id, defender_piece_id, interaction_type);
