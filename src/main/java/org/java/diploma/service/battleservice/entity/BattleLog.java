@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -16,35 +18,48 @@ import java.time.Instant;
         })
 public class BattleLog {
 
+    private static final String COLUMN_BATTLE_ID = "battle_id";
+    private static final String COLUMN_EVENT_TYPE = "event_type";
+    private static final String COLUMN_PIECE_ID = "piece_id";
+    private static final String COLUMN_POSITION_FROM = "position_from";
+    private static final String COLUMN_POSITION_TO = "position_to";
+    private static final String COLUMN_DAMAGE_AMOUNT = "damage_amount";
+    private static final String COLUMN_HP_REMAINING = "hp_remaining";
+    private static final String COLUMN_EVENT_DATA = "event_data";
+    private static final String COLUMN_CREATED_AT = "created_at";
+
+    private static final String JSONB_TYPE = "jsonb";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "battle_id", nullable = false)
+    @Column(name = COLUMN_BATTLE_ID, nullable = false)
     private Integer battleId;
 
-    @Column(name = "event_type", nullable = false)
+    @Column(name = COLUMN_EVENT_TYPE, nullable = false)
     private String eventType;
 
-    @Column(name = "piece_id")
+    @Column(name = COLUMN_PIECE_ID)
     private Long pieceId;
 
-    @Column(name = "position_from")
+    @Column(name = COLUMN_POSITION_FROM)
     private String positionFrom;
 
-    @Column(name = "position_to")
+    @Column(name = COLUMN_POSITION_TO)
     private String positionTo;
 
-    @Column(name = "damage_amount")
+    @Column(name = COLUMN_DAMAGE_AMOUNT)
     private Integer damageAmount;
 
-    @Column(name = "hp_remaining")
+    @Column(name = COLUMN_HP_REMAINING)
     private Integer hpRemaining;
 
-    @Column(name = "event_data", columnDefinition = "jsonb")
+    @Column(name = COLUMN_EVENT_DATA, columnDefinition = JSONB_TYPE)
+    @JdbcTypeCode(SqlTypes.JSON)
     private String eventData;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = COLUMN_CREATED_AT, nullable = false)
     private Instant createdAt;
 
     @PrePersist
