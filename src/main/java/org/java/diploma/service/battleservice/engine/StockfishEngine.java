@@ -84,11 +84,15 @@ public class StockfishEngine {
         }
     }
 
-    public PositionEvaluation evaluatePosition(String position, int depth) throws IOException {
+    public synchronized PositionEvaluation evaluatePosition(String position, int depth) throws IOException {
         log.debug("Evaluating position with depth: {}", depth);
 
         if (!isEngineReady()) {
-            throw new IllegalStateException(ERROR_ENGINE_NOT_READY);
+            log.warn("Stockfish process is not alive, restarting engine");
+            restartEngine();
+            if (!isEngineReady()) {
+                throw new IllegalStateException(ERROR_ENGINE_NOT_READY);
+            }
         }
 
         sendCommand(UCINEWGAME_COMMAND);
@@ -106,6 +110,74 @@ public class StockfishEngine {
         log.info(LOG_EVALUATION_FOUND, evaluation.getEvaluationScore());
 
         return evaluation;
+    }
+
+    /**
+     * Runs up to {@code maxHalfMoves} sequential searches from {@code baseFen}, each time asking for the
+     * best move in the current position (UCI {@code position fen ... moves ...}). This yields a fixed-length
+     * line when the game is still going, unlike a single-search PV whose length varies with depth/output.
+     * {@code rootCentipawns} / {@code rootBestMove} come from the first search only (opening position).
+     */
+    public synchronized FenEvaluationLine evaluateFenAndBuildGreedyLine(String baseFen, int maxHalfMoves, int depth)
+            throws IOException {
+        if (!isEngineReady()) {
+            log.warn("Stockfish process is not alive, restarting engine");
+            restartEngine();
+            if (!isEngineReady()) {
+                throw new IllegalStateException(ERROR_ENGINE_NOT_READY);
+            }
+        }
+
+        String fen = baseFen == null ? "" : baseFen.trim();
+        List<String> line = new ArrayList<>();
+        StringBuilder movesPlayed = new StringBuilder();
+        int rootCentipawns = 0;
+        String rootBestMove = null;
+
+        for (int i = 0; i < maxHalfMoves; i++) {
+            sendCommand(UCINEWGAME_COMMAND);
+            waitForReady();
+
+            final String positionCmd;
+            if (fen.isEmpty()) {
+                positionCmd = movesPlayed.isEmpty()
+                        ? POSITION_STARTPOS
+                        : POSITION_STARTPOS + " moves " + movesPlayed.toString().trim();
+            } else {
+                positionCmd = movesPlayed.isEmpty()
+                        ? POSITION_FEN + " " + fen
+                        : POSITION_FEN + " " + fen + " moves " + movesPlayed.toString().trim();
+            }
+            sendCommand(positionCmd);
+
+            sendCommand(GO_DEPTH + " " + depth);
+            PositionEvaluation ev = readEvaluation();
+
+            if (i == 0) {
+                rootCentipawns = ev.getEvaluationScore();
+                rootBestMove = ev.getBestMove();
+                log.info(LOG_EVALUATION_FOUND, rootCentipawns);
+            }
+
+            String bm = ev.getBestMove();
+            if (bm == null || bm.isBlank() || "(none)".equalsIgnoreCase(bm)) {
+                break;
+            }
+            line.add(bm);
+            if (movesPlayed.length() > 0) {
+                movesPlayed.append(' ');
+            }
+            movesPlayed.append(bm);
+        }
+
+        return new FenEvaluationLine(rootCentipawns, rootBestMove, line);
+    }
+
+    public record FenEvaluationLine(int rootCentipawns, String bestMove, List<String> line) {}
+
+    private void restartEngine() throws IOException {
+        stopEngine();
+        startEngine();
     }
 
     private void sendCommand(String command) throws IOException {
@@ -184,15 +256,14 @@ public class StockfishEngine {
     private List<String> parsePrincipalVariation(String infoLine) {
         List<String> pv = new ArrayList<>();
         try {
-            String[] parts = infoLine.split(" ");
-            boolean inPv = false;
-            for (String part : parts) {
-                if (part.equals(PV_PREFIX)) {
-                    inPv = true;
-                    continue;
-                }
-                if (inPv && part.length() >= 4 && part.matches("[a-h][1-8][a-h][1-8].*")) {
-                    pv.add(part);
+            int idx = infoLine.indexOf(" " + PV_PREFIX + " ");
+            if (idx < 0) {
+                return pv;
+            }
+            String rest = infoLine.substring(idx + PV_PREFIX.length() + 2).trim();
+            for (String token : rest.split("\\s+")) {
+                if (token.matches("[a-h][1-8][a-h][1-8][qrbn]?")) {
+                    pv.add(token);
                 }
             }
         } catch (Exception e) {

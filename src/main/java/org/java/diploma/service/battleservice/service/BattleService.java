@@ -2,6 +2,7 @@ package org.java.diploma.service.battleservice.service;
 
 import org.java.diploma.service.battleservice.dto.BattleRequest;
 import org.java.diploma.service.battleservice.dto.BattleResultResponse;
+import org.java.diploma.service.battleservice.dto.EvaluatePositionResponse;
 import org.java.diploma.service.battleservice.engine.StockfishEngine;
 import org.java.diploma.service.battleservice.entity.BattleLog;
 import org.java.diploma.service.battleservice.entity.BattleOutcome;
@@ -52,6 +53,8 @@ public class BattleService {
     private static final int MAX_DAMAGE = 30;
     private static final int EVALUATION_THRESHOLD = 100;
     private static final int VISUAL_MOVES_LIMIT = 5;
+    /** Half-moves (plies): 20 = each side plays 10 moves. */
+    private static final int EVAL_PRINCIPAL_VARIATION_LIMIT = 20;
 
     private final BattleOutcomeRepository outcomes;
     private final BattleLogRepository logs;
@@ -69,6 +72,24 @@ public class BattleService {
         this.logs = logs;
         this.interactions = interactions;
         this.stockfishEngine = stockfishEngine;
+    }
+
+    /**
+     * Static evaluation only (no DB). Centipawns are from White’s perspective (Stockfish UCI).
+     */
+    public EvaluatePositionResponse evaluateFen(String fen) throws IOException {
+        StockfishEngine.FenEvaluationLine built = stockfishEngine.evaluateFenAndBuildGreedyLine(
+                fen,
+                EVAL_PRINCIPAL_VARIATION_LIMIT,
+                stockfishDepth
+        );
+        int evaluationScore = built.rootCentipawns();
+        return new EvaluatePositionResponse(
+                evaluationScore,
+                determineAdvantage(evaluationScore),
+                built.bestMove(),
+                built.line()
+        );
     }
 
     @Transactional
