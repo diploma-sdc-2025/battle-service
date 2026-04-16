@@ -8,9 +8,15 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-RUN apt-get update && \
-    apt-get install -y stockfish && \
-    apt-get clean && \
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list ]; then \
+      sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list; \
+    fi; \
+    if [ -d /etc/apt/sources.list.d ]; then \
+      sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/* 2>/dev/null || true; \
+    fi; \
+    apt-get update -o Acquire::Retries=5; \
+    apt-get install -y --no-install-recommends ca-certificates stockfish; \
     rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m appuser
