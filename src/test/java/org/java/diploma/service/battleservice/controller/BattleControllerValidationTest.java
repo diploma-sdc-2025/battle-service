@@ -2,6 +2,7 @@ package org.java.diploma.service.battleservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.java.diploma.service.battleservice.dto.BattleResultResponse;
+import org.java.diploma.service.battleservice.dto.EvaluatePositionResponse;
 import org.java.diploma.service.battleservice.service.BattleService;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
 import java.util.List;
+import java.io.IOException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -26,10 +28,13 @@ class BattleControllerValidationTest {
     private static final Logger log = LoggerFactory.getLogger(BattleControllerValidationTest.class);
 
     private static final String ENDPOINT_SIMULATE = "/api/battle/simulate";
+    private static final String ENDPOINT_EVALUATE = "/api/battle/evaluate";
     private static final String CONTENT_TYPE_JSON = MediaType.APPLICATION_JSON_VALUE;
     private static final String JSON_PATH_BATTLE_ID = "$.battleId";
     private static final String JSON_PATH_WINNER_ID = "$.winnerId";
     private static final String JSON_PATH_DAMAGE_DEALT = "$.damageDealt";
+    private static final String JSON_PATH_EVAL_SCORE = "$.centipawns";
+    private static final String JSON_PATH_ADVANTAGE = "$.advantage";
 
     private static final String TEST_JSON_MISSING_FIELDS = """
             { "roundNumber": 1, "attackerId": 10 }
@@ -50,6 +55,9 @@ class BattleControllerValidationTest {
                 "attackerId": 10,
                 "defenderId": 20
             }
+            """;
+    private static final String TEST_JSON_EVALUATE = """
+            { "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" }
             """;
 
     private static final Integer TEST_BATTLE_ID = 1;
@@ -122,5 +130,28 @@ class BattleControllerValidationTest {
                 .andExpect(jsonPath(JSON_PATH_DAMAGE_DEALT).value(TEST_DAMAGE_DEALT));
 
         log.info(LOG_TEST_COMPLETE, "simulate_returns200_whenValidRequest");
+    }
+
+    @Test
+    void evaluate_returns200_whenValidRequest() throws Exception {
+        when(battleService.evaluateFen(any()))
+                .thenReturn(new EvaluatePositionResponse(45, "WHITE", "e2e4", List.of("e2e4", "e7e5")));
+
+        mockMvc.perform(post(ENDPOINT_EVALUATE)
+                        .contentType(CONTENT_TYPE_JSON)
+                        .content(TEST_JSON_EVALUATE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_PATH_EVAL_SCORE).value(45))
+                .andExpect(jsonPath(JSON_PATH_ADVANTAGE).value("WHITE"));
+    }
+
+    @Test
+    void evaluate_returns503_whenEngineThrowsIOException() throws Exception {
+        when(battleService.evaluateFen(any())).thenThrow(new IOException("engine down"));
+
+        mockMvc.perform(post(ENDPOINT_EVALUATE)
+                        .contentType(CONTENT_TYPE_JSON)
+                        .content(TEST_JSON_EVALUATE))
+                .andExpect(status().isServiceUnavailable());
     }
 }
