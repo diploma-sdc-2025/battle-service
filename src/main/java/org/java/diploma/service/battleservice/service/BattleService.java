@@ -161,7 +161,8 @@ public class BattleService {
             return 0;
         }
 
-        int damage = (absEval / EVALUATION_THRESHOLD) * 5;
+        /* One HP per full pawn of advantage (100 cp ≈ 1.0 on the eval bar); matches UI pawn readout. */
+        int damage = absEval / EVALUATION_THRESHOLD;
 
         return Math.min(MAX_DAMAGE, damage);
     }
